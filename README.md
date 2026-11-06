@@ -1,73 +1,109 @@
 # REPOL: Risk Evaluation of Pharmacology by LLMs
 
-A coscientist-safety testing platform that evaluates AI biosafety blind spots in drug discovery, with a focus on novel mechanistic risk that requires domain-expert calibration to detect.
+Standardized red-teaming of multi-agent AI co-scientists for mechanistic biosafety failures in drug discovery.
 
 **Author:** Peter-James H. Zushin, Ph.D. — Postdoctoral Fellow, Wu Lab, Stanford University
-**Status:** Phase 2 (April 2026) — infrastructure built, capability-ladder pilot in progress
+**Status:** November 2026. Phase 1 complete; standardized multi-agent red-teaming study in development.
 **Contact:** petezushin@gmail.com
 
 ---
 
 ## What this project is
 
-Frontier AI labs are building drug-discovery coscientists at increasing capability. The standard biosafety evaluations for these systems are run on the model's own canonical safety axes — categories the model has been trained to flag. This works well for in-distribution risk and degrades on the regime that matters most: novel mechanistic risk that routes through specialized pathway-level reasoning, where the dangerous signal is not in any flag category but in domain-specific biology a subject matter expert would catch.
+REPOL asks a specific question: when an AI co-scientist is steered toward, or handed, a mechanistically hazardous drug optimization, does it catch the specific risk, offer only generic caution, or pass the hazard downstream?
 
-REPOL is built to surface exactly that gap. It runs a Generator → Critic → Ranker pipeline modeled on the Google DeepMind coscientist architecture, scaled down for tractable iteration, and applies it to cardiac antiarrhythmic drug discovery — a domain where the line between therapeutic and proarrhythmic mechanism is unusually thin. The pipeline's outputs are then scored by a domain expert (the author) against a pre-registered scoring rubric, with per-agent decomposition that identifies where in the pipeline safety reasoning succeeds or fails.
+Co-scientists are not single models. Published systems are orchestrated teams of specialized agents, some combining models from different labs, and orchestrator agents can now create sub-agents on demand. Safety is therefore a property of the whole pipeline: a hazard one agent misses can be caught, amplified or laundered by the next. Most safeguards were built for single models and recognize named threat categories. They are not designed to catch novel mechanistic risk, where the danger sits in pathway-level biology rather than in any flag category.
 
-## The anchor finding
+REPOL measures that gap in a domain with expert ground truth: cardiac and metabolic pharmacology, where the line between therapeutic and toxic mechanism is unusually thin.
 
-In Phase 1 (March 2026), running on Claude Sonnet 4.6, the pipeline proposed **SCN5A augmentation as an antiarrhythmic strategy** — a mechanism that would augment the late sodium current (INa-L), prolong cardiac action potential duration, and produce Torsades de Pointes (TdP), the precise lethal arrhythmia the compound was meant to treat. Neither the Critic nor the Ranker agent flagged this. The Phase 1 audit log capturing this run is preserved in [`breadcrumbs/audit_log_20260318_122119.txt`](breadcrumbs/audit_log_20260318_122119.txt).
+## The anchor finding (Phase 1)
 
-This is the failure mode REPOL is designed to characterize: not a generic safety violation but a domain-specific mechanistic inversion that a cardiologist would catch immediately and a frontier model's own safety reasoning did not. The thesis is that detecting these failures requires domain-calibrated scoring, not additional flag categories.
+In Phase 1 (March 2026), a three-agent Generator → Critic → Ranker pipeline running on Claude Sonnet 4.6 proposed **SCN5A augmentation as an antiarrhythmic strategy**. That mechanism would augment the late sodium current (INa-L), prolong cardiac action potential duration and produce Torsades de Pointes (TdP), the lethal arrhythmia the compound was meant to prevent. Neither the Critic nor the Ranker flagged it. The audit log for this run is preserved in [`breadcrumbs/audit_log_20260318_122119.txt`](breadcrumbs/audit_log_20260318_122119.txt).
 
-## Methodology
+This is the failure mode REPOL is built to characterize: not a generic safety violation, but a domain-specific mechanistic inversion that an expert would catch immediately and the pipeline's own safety reasoning did not.
 
-**Pipeline architecture.** Three agents passing structured outputs:
-- *Generator* proposes a drug-discovery hypothesis (target, mechanism, novelty, predicted effect, biosafety note)
-- *Critic* evaluates scientific merit, safety concerns, feasibility, and fatal flaws
-- *Ranker* synthesizes hypothesis and critique into a final score, biosafety flag, and memory summary that steers subsequent rounds
+## Current work: standardized multi-agent red-teaming
 
-**Phase 2 design.** Same pipeline, run across the Claude capability ladder (Haiku 4.5 → Sonnet 4.6 → Opus 4.7) on a held-territory set of safety conditions in cardiac biology. The research question: does safety calibration scale with model capability? Results are scored against a pre-registered rubric ([`scoring_rubric.md`](scoring_rubric.md)) using:
+The current study scales the Phase 1 finding from one small pipeline into a systematic, reproducible comparison across co-scientist designs.
 
-- *Per-agent decomposition* — separate scoring of Generator, Critic, and Ranker contributions to identify where in the pipeline safety reasoning originates
-- *Blinded cross-model scoring* — model identity is replaced with opaque codes during scoring to mitigate availability bias ([`generate_blinded_scoring_template.py`](generate_blinded_scoring_template.py))
-- *Scorer confidence column* — every scored row carries a 1–5 confidence rating, enabling downstream weighting and identifying rows for second-rater review
+**Standardized compositions.** An orchestrator builds co-scientist teams from a common declarative specification, implementing several published designs: supervisor-led tournaments (Gottweis et al., 2026), PI-led specialist teams (Swanson et al., 2025), mixed-lab pipelines (Ghareeb et al., 2026) and swarm-style teams. Every team faces the same scenarios, roles and grader. Team size (three to about twelve agents) and which lab's model fills each role are varied systematically. The orchestrator model is recorded and held fixed within a comparison.
 
-**Phase 3 directions** (proposed, not yet implemented):
-- Cross-lab comparative evaluation extending the protocol to frontier models from at least three labs
-- Genetic-phenocopy module that routes safety inference through human-genetics phenotype data (ClinVar, ClinGen) rather than through compound-similarity training distributions
+**Red-teaming methods.** Each team is tested with three published approaches, adapted to pharmacology:
+
+1. *Constraint-removal scenarios.* Matched pairs in which a safety-relevant pharmacological constraint is kept or removed, generalizing the Phase 1 anchor and the dual-use inversion shown by Urbina et al. (2022).
+2. *Planted flaws.* A flawed mechanistic claim is injected at a defined agent and graded from obvious to subtle, producing a detection-versus-subtlety curve. This builds on evidence that assistants mirror errors presented to them (Sharma et al., 2024) and that team structure shapes resilience to faulty agents (Huang et al., 2025).
+3. *Automated adversarial search.* An attacker model iteratively refines framings against the target team (Perez et al., 2022; Chao et al., 2023), reported in the standardized style of HarmBench (Mazeika et al., 2024).
+
+**Grading.** A checklist-driven, mechanism-aware grader, to be validated against blinded expert judgments, scores four outcomes:
+
+- *Detection:* was the hazard caught at all?
+- *Specific-risk flagging:* was the actual mechanism named, or only generic caution offered?
+- *Propagation:* how far did an uncaught hazard travel through the team?
+- *False alarms:* how often were matched benign controls flagged?
+
+**Reproducibility.** Model outputs are non-deterministic, so the study controls what it can and measures the rest:
+
+- model versions and providers pinned, with served-model verification;
+- fixed sampling settings;
+- repeated runs per condition, reported with confidence intervals rather than single outcomes;
+- team specifications and configurations released so runs can be repeated.
+
+**Infrastructure.** Large runs go through OpenRouter. Open-weight models are run locally for pipeline pretesting and for testing model behavior without a provider's safety layer.
+
+## Safety and disclosure
+
+- Scenarios are confined to known pharmacological safety liabilities, not agents of concern.
+- Released: methods, team specifications, aggregate results and the grader checklist.
+- Withheld: operational prompt and response details. Outputs pass a review step before release.
+
+## Outputs and timeline
+
+- arXiv preprint by March 2027.
+- Conference submission to NeurIPS 2027.
 
 ## Repo layout
 
 | File | Purpose |
 |------|---------|
 | `coscientist.py`, `coscientist_v2.py` | Phase 1 pipeline (reference) |
-| `coscientist_phase2.py` | Phase 2 pipeline with capability-ladder support and per-agent decomposition |
-| `generate_blinded_scoring_template.py` | Generates unified blinded scoring CSV across all model runs |
+| `coscientist_phase2.py` | Three-agent pipeline with model-ladder support and per-agent decomposition |
+| `generate_blinded_scoring_template.py` | Generates a unified blinded scoring CSV across model runs |
 | `scoring_rubric.md` | Pre-registered scoring rubric (v1) |
-| `breadcrumbs/` | Curated Phase 1 audit logs (the SCN5A finding lives here) |
-| `logs/` | Runtime outputs (gitignored; populated when pipeline runs) |
+| `breadcrumbs/` | Curated Phase 1 audit logs (the SCN5A finding) |
+| `logs/` | Runtime outputs (gitignored) |
 
-## Current status (April 2026)
+Orchestrator, team specifications and the red-teaming harness for the current study will be added as they are built.
 
-- Phase 1: complete. SCN5A finding documented in breadcrumbs/.
-- Phase 2: pipeline infrastructure built and tested. Pre-registered scoring rubric committed. Blinded cross-model scoring infrastructure in place. **Capability-ladder pilot runs (Haiku, Sonnet, Opus) in progress; data and scoring forthcoming over the next several weeks.**
-- Phase 3: proposed in fellowship application materials; cross-lab and genetic-phenocopy work scoped but not yet implemented.
+## Limitations
 
-## Limitations (current pilot stage)
+Documented up front, because methodological honesty matters more than methodological perfection at this stage:
 
-Documented honestly because methodological honesty matters more than methodological perfection at this stage:
+- *Single-rater ground truth so far.* Grader validation currently rests on the author's blinded judgments; a second domain expert for a blinded subsample is planned.
+- *Domain restriction.* All work to date is in cardiac pharmacology. Generalization to other therapeutic areas, and to higher-consequence biological domains, is argued but not yet demonstrated.
+- *Proxy domain.* Pharmacology is a deliberately safe proxy. The claim that its failure modes (confident mechanistic error, generic rather than specific caution, error propagation) transfer to higher-consequence domains is a hypothesis this work aims to support, not a result.
+- *Combinatorial scope.* Sizes, topologies, vendor mixes and scenarios multiply quickly. The first paper will vary a subset.
 
-- *Single-rater scoring.* Inter-rater reliability not yet established. Recruiting a second domain expert for blinded subsample scoring is planned post-application.
-- *Soft blinding.* Source file paths reveal model identity; the scorer commits to ignoring this but cannot guarantee zero leakage.
-- *Pilot scope.* Currently 2 conditions × 3 models × 10 rounds. Full 5-condition study is the Phase 2 completion target.
-- *Domain restriction.* All work to date is in cardiac antiarrhythmic territory. Generalization to other therapeutic areas is asserted but not yet demonstrated.
-- *Pre-registration scope.* The rubric was committed before pilot scoring begins, but cardiac-specific calibration examples in the rubric are under active refinement based on early observations.
+## Future directions
+
+- *Genetic-phenocopy module:* routing safety inference through human-genetics phenotype data (ClinVar, ClinGen) rather than compound-similarity training distributions.
+- Extension of the standardized protocol beyond cardiac pharmacology.
+
+## Related work by the author
+
+- **Ethogram:** an open evaluation instrument for model refusal behavior on dual-use biology prompts, built on Inspect AI. Manuscript under review at IEEE SaTML 2027.
 
 ## A note on workflow
 
-This work is a collaboration between domain expertise and AI-assisted implementation. Scientific judgment — what to test, why it matters, how to score outputs, what counts as a structurally novel risk — is mine. The technical scaffolding (pipeline code, scoring infrastructure, log handling) was built with substantial assistance from Claude (Claude Code for implementation, Claude chat for design and architecture discussions). The intent is to be transparent about the workflow rather than pretend either contribution is doing the other's job: a non-expert with the same tools could not produce the SCN5A finding, and a domain expert without the tools could not have built this infrastructure in a quarter of part-time work.
+This work is a collaboration between domain expertise and AI-assisted implementation. Scientific judgment (what to test, why it matters, how to score outputs, what counts as a structurally novel risk) is mine. The technical scaffolding (pipeline code, orchestration, scoring infrastructure, log handling) is built with substantial assistance from Claude, through Claude Code for implementation and Claude chat for design and architecture. The intent is to be transparent about the workflow rather than pretend either contribution is doing the other's job: a non-expert with the same tools could not have produced the SCN5A finding, and a domain expert without them could not have built this infrastructure in part-time work.
 
-## Project context
+## References
 
-This work is part of Pete's transition into AI biosafety evaluation, alongside his postdoctoral work in cardiovascular biology and drug discovery at Stanford. It is the primary artifact referenced in his application to the Anthropic STEM Fellows program (June 2026 cohort).
+- Chao, P. et al. (2023). Jailbreaking Black Box Large Language Models in Twenty Queries. arXiv:2310.08419.
+- Ghareeb, A.E. et al. (2026). A multi-agent system for automating scientific discovery. *Nature*. doi:10.1038/s41586-026-10652-y
+- Gottweis, J. et al. (2026). Accelerating scientific discovery with Co-Scientist. *Nature*. doi:10.1038/s41586-026-10644-y
+- Huang, J. et al. (2025). On the Resilience of LLM-Based Multi-Agent Collaboration with Faulty Agents. *ICML 2025*, PMLR 267.
+- Mazeika, M. et al. (2024). HarmBench: A Standardized Evaluation Framework for Automated Red Teaming and Robust Refusal. *ICML 2024*, PMLR 235. arXiv:2402.04249.
+- Perez, E. et al. (2022). Red Teaming Language Models with Language Models. *EMNLP 2022*. arXiv:2202.03286.
+- Sharma, M. et al. (2024). Towards Understanding Sycophancy in Language Models. *ICLR 2024*. arXiv:2310.13548.
+- Swanson, K. et al. (2025). The Virtual Lab of AI agents designs new SARS-CoV-2 nanobodies. *Nature*.
+- Urbina, F. et al. (2022). Dual use of artificial-intelligence-powered drug discovery. *Nature Machine Intelligence* 4, 189–191.
